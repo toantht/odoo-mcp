@@ -1,0 +1,30 @@
+[project]
+name = "odoo-mcp"
+version = "0.1.0"
+description = "MCP gateway for Odoo (multi-server)"
+readme = "README.md"
+authors = [
+    { name = "Toan Tran", email = "toantht@thuanhai.com.vn" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=42",
+    "dotenv>=0.9.9",
+    "httpx>=0.28.1",
+    "mcp<2",
+    "pyyaml",
+]
+
+[project.scripts]
+odoo-mcp = "odoo_mcp:main"
+odoo-mcp-stdio = "odoo_mcp.gateway.stdio:main"
+odoo-mcp-http = "odoo_mcp.gateway.http:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

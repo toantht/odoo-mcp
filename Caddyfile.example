@@ -1,0 +1,17 @@
+# Phase 7: example Caddy config for the optional `caddy` compose
+# service (profile "https"). Caddy gets automatic HTTPS (Let's Encrypt)
+# for free from just a domain name - no manual cert/CA setup needed.
+#
+# Copy to `Caddyfile` (git-ignored, may contain your real domain) and
+# edit the domain:
+#   cp Caddyfile.example Caddyfile
+#
+# Already running Traefik/nginx/another reverse proxy for this host?
+# Skip the `caddy` compose service entirely and just point your
+# existing proxy at the `gateway` container's published port
+# (127.0.0.1:8000, see docker-compose.yml) instead of adding a second
+# one - one HTTPS terminator per host is enough.
+
+mcp.example.com {
+	reverse_proxy gateway:8000
+}

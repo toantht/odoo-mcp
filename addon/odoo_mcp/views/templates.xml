@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="consent_page" name="Odoo MCP - Consent">
+        <t t-call="web.layout">
+            <div class="container o_odoo_mcp_consent" style="max-width: 480px; margin-top: 4em;">
+                <h3>Cho phép Claude kết nối với quyền của bạn?</h3>
+                <p>
+                    Đăng nhập với tài khoản <strong t-esc="user.name"/>
+                    (<t t-esc="user.login"/>).
+                </p>
+                <p class="text-muted">
+                    Claude sẽ thao tác trên Odoo đúng bằng quyền của bạn. Bạn có thể thu hồi
+                    quyền này bất cứ lúc nào trong Account Security bằng cách xóa API key
+                    tên "Claude MCP".
+                </p>
+                <form method="post" action="/odoo_mcp/authorize">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <input type="hidden" name="redirect_uri" t-att-value="redirect_uri"/>
+                    <input type="hidden" name="state" t-att-value="state"/>
+                    <button type="submit" name="allow" value="1" class="btn btn-primary">Cho phép</button>
+                    <button type="submit" name="allow" value="" class="btn btn-secondary ms-2">Từ chối</button>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <template id="consent_error" name="Odoo MCP - Consent error">
+        <t t-call="web.layout">
+            <div class="container o_odoo_mcp_consent_error" style="max-width: 480px; margin-top: 4em;">
+                <h3>Không thể kết nối Claude</h3>
+                <p t-esc="message"/>
+            </div>
+        </t>
+    </template>
+</odoo>

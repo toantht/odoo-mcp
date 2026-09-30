@@ -1,0 +1,33 @@
+# LibreChat custom config for the odoo-mcp deployment
+# (blueprint-librechat.md). Copy to librechat.yaml (git-ignored - may
+# contain a real gateway URL) and edit the url(s) below.
+#
+# One entry here per Odoo server this gateway exposes at
+# /mcp/<server_id> (see config/servers.yaml at the repo root) that this
+# LibreChat instance should be able to connect to.
+
+version: 1.3.17
+cache: true
+
+mcpServers:
+  odoo_a:
+    type: streamable-http
+    url: https://mcp.example.com/mcp/odoo_a
+    # Gateway is a real OAuth 2.1 server (Phase 12) - dynamic client
+    # registration means no oauth.client_id/client_secret is needed
+    # here, LibreChat registers itself on first Authenticate.
+    requiresOAuth: true
+    # Do not connect at LibreChat startup with some system user - only
+    # when a real user clicks Authenticate in MCP Settings.
+    startup: false
+
+  # A second server, matching config/servers.example.yaml's odoo_b.
+  # Leave write_tools empty on the gateway side (servers.yaml) unless
+  # this connector should be able to write - confirm=true on a
+  # create/write tool call is an argument the model sends itself, not
+  # an approval button LibreChat shows.
+  # odoo_b:
+  #   type: streamable-http
+  #   url: https://mcp.example.com/mcp/odoo_b
+  #   requiresOAuth: true
+  #   startup: false

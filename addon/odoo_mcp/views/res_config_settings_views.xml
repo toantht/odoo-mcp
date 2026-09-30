@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.odoo.mcp</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="MCP Gateway" string="MCP Gateway" name="odoo_mcp" groups="base.group_system">
+                    <block title="Claude MCP consent" name="odoo_mcp_consent">
+                        <setting string="Channel Secret"
+                                 help="Shared secret the MCP gateway presents when redeeming a consent code at /odoo_mcp/token."
+                                 id="odoo_mcp_channel_secret_setting">
+                            <field name="odoo_mcp_channel_secret" password="True"/>
+                        </setting>
+                        <setting string="Allowed redirect URIs"
+                                 help="One gateway callback URL per line. /odoo_mcp/authorize only accepts an exact match."
+                                 id="odoo_mcp_redirect_uris_setting">
+                            <field name="odoo_mcp_redirect_uris" widget="text"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_odoo_mcp_settings" model="ir.actions.act_window">
+        <field name="name">MCP Gateway</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'odoo_mcp'}</field>
+    </record>
+
+    <menuitem id="menu_odoo_mcp_settings"
+              name="MCP Gateway"
+              parent="base.menu_administration"
+              action="action_odoo_mcp_settings"
+              sequence="99"
+              groups="base.group_system"/>
+</odoo>

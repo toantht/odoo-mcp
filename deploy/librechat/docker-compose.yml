@@ -1,0 +1,64 @@
+# LibreChat as an MCP OAuth client for the odoo-mcp gateway.
+# See blueprint-librechat.md and deploy/librechat/README.md.
+#
+# This is a separate, self-contained stack (its own MongoDB and
+# Meilisearch) - it does not join the root docker-compose.yml, and it
+# never talks to the gateway container directly: it must reach
+# ODOO_MCP_PUBLIC_URL, the same public https URL Claude.ai would use.
+#
+#   cp .env.example .env               # then fill in secrets
+#   cp librechat.yaml.example librechat.yaml   # then edit the gateway URL(s)
+#   docker compose up -d
+#   curl http://127.0.0.1:${PORT:-3080}/api/health
+
+services:
+  api:
+    container_name: librechat
+    image: registry.librechat.ai/librechat-ai/librechat-dev:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3080}:${PORT:-3080}"
+    depends_on:
+      - mongodb
+      - meilisearch
+    environment:
+      - HOST=0.0.0.0
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+    env_file:
+      - .env
+    volumes:
+      - type: bind
+        source: ./librechat.yaml
+        target: /app/librechat.yaml
+      - type: bind
+        source: ./.env
+        target: /app/.env
+      - ./images:/app/client/public/images
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - librechat_data:/app/data
+
+  mongodb:
+    container_name: librechat-mongodb
+    image: mongo:8.0.20
+    restart: unless-stopped
+    command: mongod --noauth
+    volumes:
+      - librechat_mongo_data:/data/db
+
+  meilisearch:
+    container_name: librechat-meilisearch
+    image: getmeili/meilisearch:v1.35.1
+    restart: unless-stopped
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+    volumes:
+      - librechat_meili_data:/meili_data
+
+volumes:
+  librechat_data:
+  librechat_mongo_data:
+  librechat_meili_data:

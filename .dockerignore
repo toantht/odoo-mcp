@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.git/
+.gitignore
+
+# Secrets / local overrides - passed in at runtime via env_file/volumes,
+# never baked into the image (see docker-compose.yml).
+.env
+.env.*
+!.env.example
+config/servers.yaml
+Caddyfile
+
+tests/
+scripts/
+blueprint.md

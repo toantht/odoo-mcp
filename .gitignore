@@ -1,0 +1,41 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Server registry (may contain internal URLs) - keep the example only
+config/servers.yaml
+
+# Phase 12: OAuth client registrations + encrypted API keys
+config/vault.sqlite3
+
+# Phase 7: real reverse-proxy config (may contain a real domain) - keep
+# the example only
+Caddyfile
+
+# deploy/librechat: separate LibreChat stack (blueprint-librechat.md) -
+# keep the .example files only, plus its runtime data dirs
+deploy/librechat/librechat.yaml
+deploy/librechat/images/
+deploy/librechat/uploads/
+deploy/librechat/logs/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

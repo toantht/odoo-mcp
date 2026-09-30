@@ -1,0 +1,53 @@
+# Odoo MCP server registry.
+#
+# Copy this file to `servers.yaml` (same directory, git-ignored) and edit
+# it for your own pilot server(s), or point ODOO_MCP_CONFIG at a file
+# anywhere else. Select which server a *stdio* gateway uses at runtime
+# with `ODOO_MCP_SERVER=<id>` (e.g. `ODOO_MCP_SERVER=odoo_a`); the HTTP
+# gateway (Phase 6) instead mounts every server below at its own
+# `/mcp/<id>` endpoint, all at once.
+#
+# The API key is never stored here. Phase 2-11 / stdio: keep it in
+# `ODOO_API_KEY` (env/.env). Phase 12, odoo-mcp-http's default OAuth mode:
+# there is no shared key at all - each server needs its own
+# `ODOO_MCP_CHANNEL_SECRET_<id-upper-cased>` env var instead (matching that
+# Odoo server's Settings > MCP Gateway > "MCP Channel Secret"), see
+# .env.example.
+#
+# Phase 9: `write_tools` is an optional per-server allowlist of write
+# tool names (e.g. `write_tools: [create_partner]`). Omitted/empty (the
+# default here) means no write tools are exposed for that server at
+# all - only explicitly listed servers get write access, and even then
+# each write tool still defaults to preview-only (`confirm: false`)
+# unless the caller opts in per-call. See README Phase 9.
+#
+# Phase 11: `allowed_models` is an optional per-server, per-model
+# allowlist of which fields the generic `describe_model`/`search_read`/
+# `create`/`write` tools may read/write. Omitted/empty (the default
+# here) means no model is opened at all - a model not listed is
+# refused by every generic tool, even `res.users`/`ir.*` (there is no
+# hard-coded denylist on top of this allowlist). See README Phase 11.
+servers:
+  odoo_a:
+    url: https://example.odoo.com
+    db: prod # optional - omit entirely for single-database servers
+    version: 19
+    backend: json2 # json2 (Odoo 19+) | xmlrpc (Odoo <=18)
+    # write_tools: [create_partner]
+    allowed_models:
+      res.partner:
+        read: all # or a list of field names, e.g. [name, email]
+        # write: [name, email, phone]  # missing/empty = no write access
+
+  # Phase 8: a second server, on the legacy XML-RPC backend (Odoo <=18).
+  # `db` and `login` are both required for xmlrpc (no bearer-key
+  # shortcut like json2's optional X-Odoo-Database) - `login` is a
+  # username/email, not a secret, so it lives here; the password half
+  # is still ODOO_API_KEY (Odoo accepts an API key as the XML-RPC
+  # password since 14.0).
+  odoo_b:
+    url: https://legacy.example.com
+    db: legacy_prod
+    login: mcp-integration@example.com
+    version: 17
+    backend: xmlrpc

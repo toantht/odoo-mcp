@@ -1,0 +1,51 @@
+# Phase 7: run the HTTP gateway as a container, optionally with Caddy
+# in front for automatic HTTPS. See README "Phase 7" for the full
+# walkthrough.
+#
+# Minimal (gateway only, no public HTTPS - e.g. behind a reverse proxy
+# you already run elsewhere, or for local testing):
+#   docker compose up --build
+#
+# With the bundled Caddy reverse proxy (automatic HTTPS via Let's
+# Encrypt, needs a real DNS name pointed at this host and ports 80/443
+# reachable from the internet):
+#   cp Caddyfile.example Caddyfile   # then edit the domain
+#   docker compose --profile https up --build
+
+services:
+  gateway:
+    build: .
+    image: odoo-mcp-gateway:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Phase 5 registry - copy config/servers.example.yaml to
+      # config/servers.yaml first (git-ignored, see .gitignore).
+      - ./config/servers.yaml:/app/config/servers.yaml:ro
+    ports:
+      # Bound to localhost only: reachable via `curl` on this host or
+      # from the `caddy` service on the internal compose network, but
+      # not directly from the internet. Drop the "127.0.0.1:" prefix
+      # only if you're not using a reverse proxy AND you understand
+      # this exposes plain HTTP (no TLS, no auth beyond the Odoo API
+      # key already required per-request).
+      - "127.0.0.1:8000:8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["https"]
+    depends_on:
+      - gateway
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
