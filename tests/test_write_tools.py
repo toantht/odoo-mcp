@@ -80,7 +80,6 @@ def test_build_mcp_server_write_tools_not_registered_by_default() -> None:
     assert "write" not in names
     assert {
         "ping",
-        "list_models",
         "describe_model",
         "search_read",
         "search_count",

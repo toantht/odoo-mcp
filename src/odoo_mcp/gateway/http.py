@@ -16,8 +16,9 @@ Phase 9: each server's own `write_tools:` allowlist (`ServerConfig
 .write_tools`) is passed straight through to `build_mcp_server`, so
 `/mcp/odoo_a` and `/mcp/odoo_b` can each expose a different (or empty)
 set of write tools - unlike the API key, this is not shared across
-servers. Phase 11 does the same for `ServerConfig.allowed_models` (which
-models/fields the generic tools may read/write).
+servers. Phase 11 added an analogous `ServerConfig.allowed_models`
+(which models/fields the generic tools may read/write); Phase 16
+removes it - model access is now the API-key user's own Odoo rights.
 
 Phase 12 - who a tool call runs as:
 By default every mounted server requires a Claude OAuth session tied to
@@ -242,7 +243,6 @@ def _build_mcp_servers(
             f"odoo-mcp-{server_id}",
             _backend_factory,
             write_tools=config.write_tools,
-            allowed_models=config.allowed_models,
             cache_backend=not oauth_enabled,
             transport_security=_transport_security(public_url),
         )
@@ -507,7 +507,7 @@ class RateLimitMiddleware:
 def main() -> None:
     import uvicorn
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
     load_dotenv()
     host = os.environ.get("ODOO_MCP_HTTP_HOST", "127.0.0.1")
     port = int(os.environ.get("ODOO_MCP_HTTP_PORT", "8000"))

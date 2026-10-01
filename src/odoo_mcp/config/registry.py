@@ -29,26 +29,19 @@ Omitted/empty means no write tools are exposed at all - write access is
 opt-in, matching the plan's default `confirm: false` (preview-only)
 stance. See `core.mcp_server.WRITE_TOOL_NAMES` for valid names.
 
-Phase 11 adds an optional `allowed_models` field: a per-server,
+Phase 11 added an optional `allowed_models` field (a per-server,
 per-model allowlist of which fields the generic
-`describe_model`/`search_read`/`create`/`write` tools may read/write,
-e.g.:
-
-    allowed_models:
-      res.partner:
-        read: all                     # or a list of field names
-        write: [name, email, phone]   # missing/empty = no write access
-
-Missing/empty (`{}`) means no model is opened at all - same opt-in
-stance as `write_tools`. A model not listed here is refused by every
-generic tool, including `res.users`/`ir.*` - there is no hard-coded
-denylist layered on top of this allowlist.
+`describe_model`/`search_read`/`create`/`write` tools may read/write).
+Phase 16 removes it again: model/field access is now entirely the
+API-key user's own Odoo rights (`ir.model.access`/`ir.rule`/field
+`groups`) - a leftover `allowed_models:` key in an existing
+`servers.yaml` is simply ignored, not an error.
 """
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -64,21 +57,6 @@ class RegistryError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class ModelAccess:
-    """One `allowed_models.<model>` entry: which fields the generic
-    tools may read/write for that model.
-
-    `read` is either the literal string `"all"` (every field returned
-    by `fields_get`/`search_read`) or a tuple of allowed field names.
-    `write` is a tuple of allowed field names; empty means no write
-    access even if a write tool is otherwise enabled via `write_tools`.
-    """
-
-    read: str | tuple[str, ...]
-    write: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
 class ServerConfig:
     """One `servers.yaml` entry. Never carries the API key."""
 
@@ -89,7 +67,6 @@ class ServerConfig:
     backend: str
     login: str | None = None
     write_tools: tuple[str, ...] = ()
-    allowed_models: dict[str, ModelAccess] = field(default_factory=dict)
 
 
 def load_registry(path: str | Path | None = None) -> dict[str, ServerConfig]:
@@ -130,7 +107,6 @@ def load_registry(path: str | Path | None = None) -> dict[str, ServerConfig]:
             backend=str(backend),
             login=(str(fields["login"]) if fields.get("login") else None),
             write_tools=_parse_write_tools(server_id, fields, config_path),
-            allowed_models=_parse_allowed_models(server_id, fields, config_path),
         )
     return registry
 
@@ -149,56 +125,6 @@ def _parse_write_tools(
             "list of tool names, e.g. write_tools: [create_partner]."
         )
     return tuple(raw)
-
-
-def _parse_allowed_models(
-    server_id: str, fields: dict[str, Any], config_path: Path
-) -> dict[str, ModelAccess]:
-    """Parse the optional `allowed_models:` mapping. Missing/empty means
-    no model is opened (the safe default) - not an error."""
-    raw = fields.get("allowed_models")
-    if raw is None:
-        return {}
-    if not isinstance(raw, dict):
-        raise RegistryError(
-            f"Server '{server_id}' in {config_path}: 'allowed_models' must be a "
-            "mapping of model name to {read, write}, e.g. "
-            "allowed_models: {res.partner: {read: all}}."
-        )
-
-    result: dict[str, ModelAccess] = {}
-    for model_name, spec in raw.items():
-        spec = spec or {}
-        if not isinstance(spec, dict):
-            raise RegistryError(
-                f"Server '{server_id}' in {config_path}: allowed_models.'{model_name}' "
-                "must be a mapping with a 'read' key, e.g. {read: all}."
-            )
-
-        read_raw = spec.get("read")
-        if read_raw == "all":
-            read: str | tuple[str, ...] = "all"
-        elif isinstance(read_raw, list) and all(isinstance(item, str) for item in read_raw):
-            read = tuple(read_raw)
-        else:
-            raise RegistryError(
-                f"Server '{server_id}' in {config_path}: allowed_models.'{model_name}'.read "
-                "must be 'all' or a list of field names."
-            )
-
-        write_raw = spec.get("write")
-        if write_raw is None:
-            write: tuple[str, ...] = ()
-        elif isinstance(write_raw, list) and all(isinstance(item, str) for item in write_raw):
-            write = tuple(write_raw)
-        else:
-            raise RegistryError(
-                f"Server '{server_id}' in {config_path}: allowed_models.'{model_name}'.write "
-                "must be a list of field names, e.g. write: [name, email]."
-            )
-
-        result[model_name] = ModelAccess(read=read, write=write)
-    return result
 
 
 def get_server(server_id: str, path: str | Path | None = None) -> ServerConfig:

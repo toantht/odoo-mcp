@@ -8,10 +8,10 @@ pilot server (not fake/hard-coded data).
 Requires a configured `.env` (`ODOO_URL` / `ODOO_API_KEY` / optional
 `ODOO_DB`) - the spawned server loads it itself via
 `Json2Backend.from_env()`, so no `--env-file` is needed here. It also
-requires that server's `allowed_models` (Phase 11 registry, see
-`config/servers.yaml`) to include `res.partner` with at least
-`read: [id, name, email]` (or `read: all`) - otherwise `search_read`
-refuses the model before ever calling Odoo.
+requires the API key's Odoo user to have read access on `res.partner`
+(`id`/`name`/`email`) - Phase 16 moved that check onto Odoo's own
+`ir.model.access`/`ir.rule`, so an insufficiently-permissioned key now
+fails with an Odoo `AccessError`, not a local allowlist `ValueError`.
 
 Usage:
     uv run python scripts/smoke_mcp_e2e.py
@@ -49,7 +49,7 @@ async def main() -> int:
             tools = (await session.list_tools()).tools
             tool_names = [tool.name for tool in tools]
             print(f"tools/list -> {tool_names}")
-            for expected in ("list_models", "describe_model", "search_read"):
+            for expected in ("describe_model", "search_read"):
                 if expected not in tool_names:
                     print(f"FAIL: '{expected}' tool not advertised", file=sys.stderr)
                     return 1

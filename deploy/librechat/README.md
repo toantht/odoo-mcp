@@ -58,6 +58,26 @@ Phase 12 and the repo-root README.
    `Claude MCP` key is created and LibreChat reports an authorization
    error rather than Connected.
 
+## Token usage per turn
+
+The four Anthropic model specs (`sonnet`/`opus`/`fable`/`haiku`) in
+`librechat.yaml` each set, on their `preset`:
+
+- `promptCache: true` / `promptCacheTtl: "5m"` - lets Anthropic cache
+  the repeated prefix (system prompt + MCP tool schemas) across the
+  several model calls one user turn triggers, instead of billing it
+  as fresh input tokens every time.
+- `promptPrefix` - one shared block (YAML anchor `&odoo_prompt_prefix`,
+  reused via `*odoo_prompt_prefix` on the other three specs) telling
+  the model which Odoo tool is cheapest for a given question
+  (`search_count`/`read_group`/`name_search` instead of paging
+  `search_read`), so a simple question costs fewer tool-call round
+  trips.
+
+If you recreate `librechat.yaml` from `librechat.yaml.example`, copy
+these keys back in from a previous copy (or from this README) - the
+example file intentionally omits the gateway-specific URL, not these.
+
 ## Out of scope here
 
 Same as blueprint-librechat.md: no audit log by Odoo `uid`, no

@@ -21,12 +21,10 @@
 # each write tool still defaults to preview-only (`confirm: false`)
 # unless the caller opts in per-call. See README Phase 9.
 #
-# Phase 11: `allowed_models` is an optional per-server, per-model
-# allowlist of which fields the generic `describe_model`/`search_read`/
-# `create`/`write` tools may read/write. Omitted/empty (the default
-# here) means no model is opened at all - a model not listed is
-# refused by every generic tool, even `res.users`/`ir.*` (there is no
-# hard-coded denylist on top of this allowlist). See README Phase 11.
+# Phase 16: there is no `allowed_models` here - model/field access for
+# the generic `describe_model`/`search_read`/`create`/`write` tools is
+# entirely the API-key user's own Odoo rights (`ir.model.access`/
+# `ir.rule`/field `groups`), not a config allowlist. See README Phase 16.
 servers:
   odoo_a:
     url: https://example.odoo.com
@@ -34,10 +32,6 @@ servers:
     version: 19
     backend: json2 # json2 (Odoo 19+) | xmlrpc (Odoo <=18)
     # write_tools: [create_partner]
-    allowed_models:
-      res.partner:
-        read: all # or a list of field names, e.g. [name, email]
-        # write: [name, email, phone]  # missing/empty = no write access
 
   # Phase 8: a second server, on the legacy XML-RPC backend (Odoo <=18).
   # `db` and `login` are both required for xmlrpc (no bearer-key

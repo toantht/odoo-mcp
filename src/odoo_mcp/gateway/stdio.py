@@ -5,11 +5,12 @@ Phase 3 proved the MCP lifecycle (`initialize` -> `tools/list` ->
 read-only tools calling `core.tools` -> `Backend` -> the pilot Odoo
 server, closing the end-to-end loop: AI client -> MCP -> Backend ->
 Odoo. Phase 11 replaced those fixed, per-model tools with generic ones
-(`list_models`, `describe_model`, `search_read`, `create`, `write` -
-see `core.mcp_server`), gated by two registry-driven allowlists:
-`backends.write_tools_from_env` (which write tools exist at all) and
-`backends.allowed_models_from_env` (which models/fields they may touch).
-Phase 8 lets the `Backend` itself be either `Json2Backend` (Odoo 19+) or
+(`describe_model`, `search_read`, `create`, `write` - see
+`core.mcp_server`), gated by `backends.write_tools_from_env` (which
+write tools exist at all). Phase 16 removes the model/field allowlist
+Phase 11 also added - model access is now the API-key user's own Odoo
+rights, not gateway config. Phase 8 lets the `Backend` itself be either
+`Json2Backend` (Odoo 19+) or
 `XmlRpcBackend` (Odoo <=18) - same tools either way, only the registry
 entry's `backend:` value changes.
 
@@ -33,14 +34,13 @@ See README.md for full client config examples.
 
 from __future__ import annotations
 
-from odoo_mcp.backends import allowed_models_from_env, backend_from_env, write_tools_from_env
+from odoo_mcp.backends import backend_from_env, write_tools_from_env
 from odoo_mcp.core.mcp_server import build_mcp_server
 
 mcp = build_mcp_server(
     "odoo-mcp",
     backend_from_env,
     write_tools=write_tools_from_env(),
-    allowed_models=allowed_models_from_env(),
 )
 
 

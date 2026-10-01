@@ -2,7 +2,11 @@
 
 Exercises the example registry shipped in the repo
 (`config/servers.example.yaml`) plus error paths (missing file, unknown
-server id, missing env var) - no network, no real Odoo.
+server id, missing env var) - no network, no real Odoo. Phase 16
+removed the `allowed_models` field/model allowlist from `ServerConfig`
+entirely - a leftover `allowed_models:` key in an existing file is
+simply ignored, not an error (see
+`test_leftover_allowed_models_key_is_ignored`).
 """
 
 from __future__ import annotations
@@ -12,7 +16,6 @@ from pathlib import Path
 import pytest
 
 from odoo_mcp.config.registry import (
-    ModelAccess,
     RegistryError,
     get_server,
     load_registry,
@@ -149,109 +152,19 @@ def test_write_tools_rejects_non_list(tmp_path: Path) -> None:
         load_registry(config)
 
 
-def test_allowed_models_defaults_to_empty_when_omitted() -> None:
-    registry = load_registry(_EXAMPLE_PATH)
-
-    assert registry["odoo_b"].allowed_models == {}
-
-
-def test_allowed_models_parses_example_file() -> None:
-    registry = load_registry(_EXAMPLE_PATH)
-
-    assert registry["odoo_a"].allowed_models == {
-        "res.partner": ModelAccess(read="all", write=())
-    }
-
-
-def test_allowed_models_parses_read_all_and_write_list(tmp_path: Path) -> None:
+def test_leftover_allowed_models_key_is_ignored(tmp_path: Path) -> None:
+    """Phase 16 removed the `allowed_models` allowlist - a leftover key
+    in an existing `servers.yaml` must not break loading."""
     config = tmp_path / "servers.yaml"
     config.write_text(
         "servers:\n  odoo_a:\n    url: https://s.example.com\n"
         "    version: 19\n    backend: json2\n"
         "    allowed_models:\n"
         "      res.partner:\n"
-        "        read: all\n"
-        "        write: [name, email]\n",
+        "        read: all\n",
         encoding="utf-8",
     )
 
     registry = load_registry(config)
-    assert registry["odoo_a"].allowed_models == {
-        "res.partner": ModelAccess(read="all", write=("name", "email"))
-    }
-
-
-def test_allowed_models_parses_read_field_list_and_omitted_write(tmp_path: Path) -> None:
-    config = tmp_path / "servers.yaml"
-    config.write_text(
-        "servers:\n  odoo_a:\n    url: https://s.example.com\n"
-        "    version: 19\n    backend: json2\n"
-        "    allowed_models:\n"
-        "      res.partner:\n"
-        "        read: [name, email]\n",
-        encoding="utf-8",
-    )
-
-    registry = load_registry(config)
-    server = registry["odoo_a"].allowed_models["res.partner"]
-    assert server.read == ("name", "email")
-    assert server.write == ()
-
-
-def test_allowed_models_rejects_non_mapping(tmp_path: Path) -> None:
-    config = tmp_path / "servers.yaml"
-    config.write_text(
-        "servers:\n  odoo_a:\n    url: https://s.example.com\n"
-        "    version: 19\n    backend: json2\n"
-        "    allowed_models: [res.partner]\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(RegistryError, match="allowed_models"):
-        load_registry(config)
-
-
-def test_allowed_models_rejects_missing_read(tmp_path: Path) -> None:
-    config = tmp_path / "servers.yaml"
-    config.write_text(
-        "servers:\n  odoo_a:\n    url: https://s.example.com\n"
-        "    version: 19\n    backend: json2\n"
-        "    allowed_models:\n"
-        "      res.partner:\n"
-        "        write: [name]\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(RegistryError, match="read"):
-        load_registry(config)
-
-
-def test_allowed_models_rejects_invalid_read_value(tmp_path: Path) -> None:
-    config = tmp_path / "servers.yaml"
-    config.write_text(
-        "servers:\n  odoo_a:\n    url: https://s.example.com\n"
-        "    version: 19\n    backend: json2\n"
-        "    allowed_models:\n"
-        "      res.partner:\n"
-        "        read: everything\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(RegistryError, match="read"):
-        load_registry(config)
-
-
-def test_allowed_models_rejects_non_list_write(tmp_path: Path) -> None:
-    config = tmp_path / "servers.yaml"
-    config.write_text(
-        "servers:\n  odoo_a:\n    url: https://s.example.com\n"
-        "    version: 19\n    backend: json2\n"
-        "    allowed_models:\n"
-        "      res.partner:\n"
-        "        read: all\n"
-        "        write: name\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(RegistryError, match="write"):
-        load_registry(config)
+    assert registry["odoo_a"].id == "odoo_a"
+    assert not hasattr(registry["odoo_a"], "allowed_models")

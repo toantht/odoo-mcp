@@ -412,7 +412,7 @@ upgraded to 19+. Check the official Odoo docs for the exact removal
 version before assuming XML-RPC will keep working indefinitely on a
 future upgrade.
 
-## Phase 11 - Generic tools (model-agnostic) + model/field allowlist
+## Phase 11 - Generic tools (model-agnostic)
 
 The fixed, business-shaped tools from Phase 4/9 (`search_partners`,
 `get_partner`, `create_partner`) are gone from `tools/list` on every
@@ -422,21 +422,17 @@ caller drives itself:
 
 | Tool | Always registered? | Behavior |
 |---|---|---|
-| `list_models()` | yes | Lists the models opened by `allowed_models` - config only, never calls Odoo. |
-| `describe_model(model)` | yes | `fields_get` (string/type/required/relation/selection), filtered to the model's read allowlist. |
-| `search_read(model, domain, fields, limit=20, offset=0)` | yes | `limit` capped at 100. If `fields` is omitted and `read` is a field list, that list is used; if `read: all`, `fields` must be passed explicitly (avoids pulling e.g. `image_1920`). |
-| `create(model, values, confirm=false)` | only if `write_tools` includes `create` | Every key of `values` must be in the model's write allowlist. |
-| `write(model, ids, values, confirm=false)` | only if `write_tools` includes `write` | Same field rule as `create`; `ids` must be non-empty, at most 100. |
+| `describe_model(model)` | yes | `fields_get` (string/type/required/relation/selection). |
+| `search_read(model, domain, fields, limit=20, offset=0)` | yes | `limit` capped at 100. `fields` must be passed explicitly (avoids pulling e.g. `image_1920`). |
+| `create(model, values, confirm=false)` | only if `write_tools` includes `create` | |
+| `write(model, ids, values, confirm=false)` | only if `write_tools` includes `write` | `ids` must be non-empty, at most 100. |
 
-Safety is two allowlists, both from config, never the AI's own request:
-
-1. **`allowed_models`** (new, per-server) - which models exist at all
-   for the generic tools, and which fields each may read/write. A model
-   missing here is refused by every generic tool, including
-   `res.users`/`ir.*` - there is no hard-coded denylist layered on top.
-2. **`write_tools`** (Phase 9, renamed values) - `WRITE_TOOL_NAMES` is
-   now `{create, write}` (the old `create_partner` name is a startup
-   `ValueError`, not a silent no-op).
+`write_tools` (Phase 9, per-server, `config/servers.yaml`) is the only
+config allowlist left - which write tools exist at all on this server.
+`WRITE_TOOL_NAMES` is `{create, write}` (an unknown name is a startup
+`ValueError`, not a silent no-op). Model/field access itself was a
+second, `allowed_models` config allowlist from Phase 11 through Phase
+15 - Phase 16 (below) removes it in favor of Odoo's own access rights.
 
 ```yaml
 # config/servers.yaml
@@ -445,18 +441,8 @@ servers:
     url: https://a.example.com
     version: 19
     backend: json2
-    allowed_models:
-      res.partner:
-        read: all                     # or a list of field names
-        write: [name, email, phone]   # missing/empty = no write access
     write_tools: [create, write]      # omit entirely for read-only servers
 ```
-
-`gateway/stdio.py` reads this via `backends.allowed_models_from_env`
-(mirrors `write_tools_from_env`; empty when there's no
-`ODOO_MCP_SERVER`/registry). `gateway/http.py` passes each server's own
-`ServerConfig.allowed_models` straight through - one server can expose
-different models/fields than another, same as `write_tools`.
 
 `core.tools.search_partners` / `get_partner` / `create_partner` (the
 Phase 4/9 Python functions) still exist, kept only for the direct-call
@@ -470,10 +456,8 @@ Automated tests (`FakeBackend` - no real Odoo):
 uv run pytest tests/test_generic_tools.py tests/test_write_tools.py tests/test_registry.py
 ```
 
-**Test / done when:** an unknown model is refused before the backend is
-ever called; a read/write/domain field outside the allowlist is a clear
-`ValueError`; `confirm=false` never writes; `confirm=true` writes
-exactly the allowlisted fields; `search_partners`/`get_partner`/
+**Test / done when:** `confirm=false` never writes; `confirm=true`
+writes exactly `values`; `search_partners`/`get_partner`/
 `create_partner` no longer appear in any server's `tools/list`.
 
 ## Phase 12 - Consent trên Odoo (OAuth 2.1 + vault)
@@ -571,15 +555,6 @@ result instead:
 | `read_group(model, fields, groupby, domain, limit=20, offset=0)` | Odoo `read_group` - one row per group (e.g. partners by country, sum of `amount_total` per state), not one row per record. `limit`/`offset` page *groups*, capped at 100 like `search_read`. |
 | `name_search(model, name, domain, operator, limit=20)` | Odoo `name_search` - `(id, display_name)` pairs for a name substring, e.g. resolving a many2one label without a full `search_read`. Capped at 100. |
 
-Same two allowlists as every other generic tool, no new bypass:
-
-- `allowed_models` still gates whether the model is opened at all.
-- Every domain clause, every `read_group` `groupby`/aggregate field
-  name (the part before `:field:agg`/`:granularity`) must be in that
-  model's read allowlist unless `read: all` - `search_count`'s domain
-  and `name_search`'s domain follow the exact same rule as
-  `search_read`'s.
-
 `search_read`'s own docstring now points the AI caller at these three
 for "how many"/"total by"/"find the id of" instead of paging rows to
 compute the answer itself.
@@ -600,7 +575,42 @@ uv run pytest tests/test_generic_tools.py tests/test_backend_contract.py
 
 **Test / done when:** `search_count` returns a plain integer;
 `read_group` returns one dict per group, not per record; `name_search`
-returns `(id, display_name)` pairs; each rejects a model outside
-`allowed_models` and a domain/groupby/aggregate field outside that
-model's read allowlist, before ever touching the backend; all three
-cap their `limit` at 100 the same way `search_read` does.
+returns `(id, display_name)` pairs; all three cap their `limit` at 100
+the same way `search_read` does.
+
+## Phase 16 - Model access moves onto Odoo's own rights
+
+Phase 11's `allowed_models` config allowlist (per-server, per-model
+read/write field lists in `servers.yaml`) is gone, along with the
+`list_models()` tool that only ever read it. Model/field access for
+every generic tool (`describe_model`/`search_read`/`search_count`/
+`read_group`/`name_search`/`create`/`write`) is now entirely the
+API-key user's own Odoo permissions - `ir.model.access`, `ir.rule`
+record rules, and field-level `groups`, enforced by Odoo itself on
+every call, not by a config lookup on the gateway.
+
+`list_models()` is removed rather than reimplemented against Odoo:
+"which models can this user read" has to be computed inside Odoo
+(`env[model].has_access("read")` over the whole registry), and
+`check_access`/`has_access` are `@api.private` - not reachable over
+JSON-2/XML-RPC. A caller who wants to see installed models can
+`search_read` `ir.model` like any other model (same `fields`
+requirement, same `limit` cap, same ACL as everywhere else), subject
+to that user's own read access on it.
+
+`write_tools` (Phase 9) is unchanged - still the one config allowlist
+left, deciding whether `create`/`write` are registered at all.
+
+Automated tests (`FakeBackend` - no real Odoo):
+
+```bash
+uv run pytest tests/test_generic_tools.py tests/test_registry.py tests/test_http_oauth.py
+```
+
+**Test / done when:** every generic tool forwards `model`/`domain`/
+`fields`/`values` straight to the `Backend` with no local allowlist
+check; `search_read` without `fields` still raises before calling the
+backend; `confirm=false` never writes; `list_models` is no longer
+registered on any `FastMCP`; `ServerConfig`/`load_registry` no longer
+know about `allowed_models` (a leftover key in an existing
+`servers.yaml` is ignored, not an error).

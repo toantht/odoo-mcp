@@ -13,12 +13,10 @@ point, shared by `gateway/stdio.py` (one backend, from env/registry) and
 need it, it already has each server's `ServerConfig.write_tools`
 directly.
 
-`allowed_models_from_env` (Phase 11) is the same, one level down: the
-per-model read/write field allowlist for `gateway/stdio.py`'s generic
-tools (`describe_model`/`search_read`/`create`/`write`). Unlike
-`write_tools_from_env`, there is no legacy env-var fallback - the
-allowlist is registry-only, so a plain `ODOO_URL` setup (no
-`ODOO_MCP_SERVER`) always gets an empty allowlist (every model refused).
+Phase 11 added an analogous `allowed_models_from_env` (a per-model
+read/write field allowlist for `gateway/stdio.py`'s generic tools).
+Phase 16 removes it: model/field access is now entirely the API-key
+user's own Odoo rights, not a gateway-side config lookup.
 """
 
 from __future__ import annotations
@@ -27,7 +25,7 @@ import os
 
 from dotenv import load_dotenv
 
-from odoo_mcp.config.registry import ModelAccess, RegistryError, ServerConfig, get_server
+from odoo_mcp.config.registry import RegistryError, ServerConfig, get_server
 from odoo_mcp.core.backend import Backend
 
 from .fake import FakeBackend
@@ -40,7 +38,6 @@ __all__ = [
     "Json2Error",
     "XmlRpcBackend",
     "XmlRpcError",
-    "allowed_models_from_env",
     "backend_from_env",
     "build_backend",
     "write_tools_from_env",
@@ -127,27 +124,3 @@ def write_tools_from_env(*, load_dotenv_file: bool = True) -> frozenset[str]:
 
     raw = os.environ.get("ODOO_MCP_WRITE_TOOLS", "")
     return frozenset(name.strip() for name in raw.split(",") if name.strip())
-
-
-def allowed_models_from_env(*, load_dotenv_file: bool = True) -> dict[str, ModelAccess]:
-    """Phase 11: per-model read/write field allowlist for
-    `gateway/stdio.py`'s single `Backend`, mirroring `write_tools_from_env`'s
-    registry-based lookup.
-
-    If `ODOO_MCP_SERVER` is set, uses that server's `allowed_models:`
-    entry in the Phase 5 registry (`config/servers.yaml`). Otherwise
-    (no registry - a raw `ODOO_URL` setup) there is no config source for
-    this, so it defaults to empty - no model is opened at all.
-    """
-    if load_dotenv_file:
-        load_dotenv()
-
-    server_id = os.environ.get("ODOO_MCP_SERVER", "").strip()
-    if not server_id:
-        return {}
-
-    try:
-        server = get_server(server_id)
-    except RegistryError as exc:
-        raise Json2Error(str(exc)) from exc
-    return dict(server.allowed_models)

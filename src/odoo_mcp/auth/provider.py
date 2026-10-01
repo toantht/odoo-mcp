@@ -351,6 +351,11 @@ class OdooMcpAuthProvider:
 
         payload = await self._redeem_with_odoo(server, code=code, channel_secret=channel_secret)
         if payload is None or "error" in payload:
+            logger.warning(
+                "odoo_mcp consent redeem for '%s' denied - Odoo returned: %s",
+                txn.server_id,
+                payload,
+            )
             return construct_redirect_uri(
                 str(txn.redirect_uri), error="access_denied", state=txn.state
             )
@@ -382,7 +387,19 @@ class OdooMcpAuthProvider:
         in a JSON-RPC 2 envelope (Odoo core behaviour for that route type,
         distinct from the plain-JSON External API `/json/2/...` `Json2Backend`
         calls). Returns the inner `result` dict (`{api_key, login, uid}` or
-        `{"error": ...}`), or `None` on any network/HTTP/envelope failure."""
+        `{"error": ...}`), or `None` on any network/HTTP/envelope failure.
+
+        This call carries no Odoo session cookie (it's server-to-server,
+        identified only by the one-time `code` + `channel_secret`) - on a
+        host serving more than one database with no `dbfilter` narrowing
+        it to a single one, Odoo's core dispatch can't otherwise resolve
+        *which* database to route the request to and 404s before the
+        addon's controller ever runs. The `X-Odoo-Database` header (same
+        mechanism `Json2Backend` already sends for `/json/2/...`, see
+        `backends/json2.py`) makes that stateless, same as `db_filter`
+        would from a hostname - only sent when `server.db` is set, same
+        as `Json2Backend`."""
+        headers = {"X-Odoo-Database": server.db} if server.db else None
         try:
             response = httpx.post(
                 f"{server.url.rstrip('/')}/odoo_mcp/token",
@@ -396,6 +413,7 @@ class OdooMcpAuthProvider:
                     },
                     "id": None,
                 },
+                headers=headers,
                 timeout=15.0,
             )
             response.raise_for_status()

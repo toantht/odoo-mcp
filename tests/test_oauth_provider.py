@@ -15,6 +15,7 @@ import asyncio
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import httpx
 import pytest
 from mcp.server.auth.provider import AuthorizationParams, AuthorizeError, RegistrationError, TokenError
 from mcp.shared.auth import OAuthClientInformationFull
@@ -151,6 +152,63 @@ def test_complete_odoo_login_same_txn_cannot_be_reused(tmp_path: Path) -> None:
 
     with pytest.raises(LookupError):
         asyncio.run(provider.complete_odoo_login(txn_id, code=None, error="access_denied"))
+
+
+def test_redeem_with_odoo_sends_x_odoo_database_header_when_db_set(tmp_path: Path) -> None:
+    """A server-to-server call carries no Odoo session cookie - on a host
+    serving more than one database with no `dbfilter` narrowing it to a
+    single one, Odoo can't otherwise tell which database to route the
+    request to and 404s before the addon's controller ever runs. The
+    `X-Odoo-Database` header (same mechanism `Json2Backend` already sends
+    for `/json/2/...`) makes that stateless."""
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json={"result": {"api_key": "K", "login": "a", "uid": 1}})
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        "odoo_mcp.auth.provider.httpx.post",
+        lambda url, **kw: httpx.Client(transport=httpx.MockTransport(handler)).post(url, **kw),
+    )
+    try:
+        provider = _provider(tmp_path)
+        server = ServerConfig(
+            id="odoo_a", url="https://odoo-a.example.com", db="hrm19.test.062026", version=19, backend="json2"
+        )
+        result = asyncio.run(
+            provider._redeem_with_odoo(server, code="odoo-code", channel_secret="channel-secret")
+        )
+        assert result == {"api_key": "K", "login": "a", "uid": 1}
+        assert captured[0].headers["X-Odoo-Database"] == "hrm19.test.062026"
+    finally:
+        monkeypatch.undo()
+
+
+def test_redeem_with_odoo_omits_header_when_db_not_set(tmp_path: Path) -> None:
+    """`_server()`'s default (`db=None`, e.g. a single-database server) -
+    no reason to send a database hint Odoo never asked for."""
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json={"result": {"api_key": "K", "login": "a", "uid": 1}})
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        "odoo_mcp.auth.provider.httpx.post",
+        lambda url, **kw: httpx.Client(transport=httpx.MockTransport(handler)).post(url, **kw),
+    )
+    try:
+        provider = _provider(tmp_path)
+        result = asyncio.run(
+            provider._redeem_with_odoo(_server(), code="odoo-code", channel_secret="channel-secret")
+        )
+        assert result == {"api_key": "K", "login": "a", "uid": 1}
+        assert "X-Odoo-Database" not in captured[0].headers
+    finally:
+        monkeypatch.undo()
 
 
 def test_complete_odoo_login_success_mints_code_client_denies(

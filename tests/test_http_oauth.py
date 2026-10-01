@@ -22,7 +22,7 @@ from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 
 from odoo_mcp.auth.provider import OdooAccessToken
 from odoo_mcp.backends.fake import FakeBackend
-from odoo_mcp.config.registry import ModelAccess, ServerConfig
+from odoo_mcp.config.registry import ServerConfig
 from odoo_mcp.gateway import http as http_module
 from odoo_mcp.gateway.http import _transport_security
 
@@ -224,7 +224,6 @@ def test_backend_factory_uses_the_calling_users_vault_key(
             db=None,
             version=19,
             backend="json2",
-            allowed_models={"res.partner": ModelAccess(read="all")},
         )
     }
     servers = http_module._build_mcp_servers(registry, oauth_enabled=True)
@@ -266,7 +265,6 @@ def test_backend_factory_rejects_token_minted_for_another_server(
             db=None,
             version=19,
             backend="json2",
-            allowed_models={"res.partner": ModelAccess(read="all")},
         ),
         "odoo_b": ServerConfig(
             id="odoo_b",
@@ -274,7 +272,6 @@ def test_backend_factory_rejects_token_minted_for_another_server(
             db=None,
             version=19,
             backend="json2",
-            allowed_models={"res.partner": ModelAccess(read="all")},
         ),
     }
     servers = http_module._build_mcp_servers(registry, oauth_enabled=True)
