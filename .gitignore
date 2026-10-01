@@ -33,9 +33,15 @@ deploy/librechat/images/
 deploy/librechat/uploads/
 deploy/librechat/logs/
 
+# Standalone git repo (own history under addon/odoo_mcp/.git)
+addon/odoo_mcp/
+
 # IDE / OS
 .idea/
 .vscode/
 *.swp
 .DS_Store
 Thumbs.db
+
+# logs
+*.log
